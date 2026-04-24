@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "sessionDuration": "24h",
+  "bypassPaths": [
+    "/",
+    "/api/icon",
+    "/packages/*"
+  ]
+}

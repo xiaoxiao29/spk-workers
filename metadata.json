@@ -1,0 +1,469 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/SPKMetadata",
+  "definitions": {
+    "SPKMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "_info": {
+          "type": "string",
+          "description": "SPK INFO 文件结构说明文档"
+        },
+        "_version": {
+          "type": "string",
+          "description": "文档版本"
+        },
+        "_source_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "参考的源文件列表"
+        },
+        "required_fields": {
+          "$ref": "#/definitions/RequiredFields"
+        },
+        "optional_fields": {
+          "$ref": "#/definitions/OptionalFields"
+        },
+        "metadata_fields": {
+          "$ref": "#/definitions/MetadataFields"
+        },
+        "arch_values": {
+          "$ref": "#/definitions/ArchValues"
+        },
+        "sample_packages": {
+          "$ref": "#/definitions/SamplePackages"
+        }
+      }
+    },
+    "RequiredFields": {
+      "type": "object",
+      "description": "必需字段定义",
+      "properties": {
+        "package": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "version": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "displayname": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "description": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "maintainer": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "arch": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "firmware": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "OptionalFields": {
+      "type": "object",
+      "description": "可选字段定义",
+      "properties": {
+        "description_fre": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "description_spn": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "description_chs": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "description_cht": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "dsmuidir": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "adminport": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "reloadui": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "beta": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["boolean"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "install_dep_packages": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "example": {
+              "type": "string"
+            }
+          }
+        },
+        "package_icon": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string (base64)"]
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "changelog": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "MetadataFields": {
+      "type": "object",
+      "description": "元数据字段（之前修复的）",
+      "properties": {
+        "maintainer_url": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "distributor": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "distributor_url": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        },
+        "support_url": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["string"]
+            },
+            "description": {
+              "type": "string"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "ArchValues": {
+      "type": "object",
+      "description": "架构枚举值",
+      "properties": {
+        "x86_64": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "arm": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "noarch": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "SamplePackages": {
+      "type": "object",
+      "description": "示例包",
+      "properties": {
+        "sabnzbd": {
+          "type": "object",
+          "properties": {
+            "package": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "maintainer": {
+              "type": "string"
+            },
+            "arch": {
+              "type": "string"
+            },
+            "firmware": {
+              "type": "string"
+            },
+            "displayname": {
+              "type": "string"
+            },
+            "dsmuidir": {
+              "type": "string"
+            },
+            "adminport": {
+              "type": "string"
+            }
+          }
+        },
+        "sickbeard": {
+          "type": "object",
+          "properties": {
+            "package": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "maintainer": {
+              "type": "string"
+            },
+            "arch": {
+              "type": "string"
+            },
+            "firmware": {
+              "type": "string"
+            },
+            "displayname": {
+              "type": "string"
+            },
+            "dsmuidir": {
+              "type": "string"
+            },
+            "adminport": {
+              "type": "string"
+            },
+            "beta": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    }
+  }
+}

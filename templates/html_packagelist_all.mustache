@@ -1,0 +1,26 @@
+{{> html_head}}
+      <h1 class="page-title">所有包</h1>
+
+      <div class="package-list-all">
+        {{#packages}}
+        <div class="package-list-item">
+          <a href="{{baseUrlRelative}}package/{{package}}" class="package-link">
+            <span class="package-name">{{displayname}}</span>
+            <span class="package-version">v{{version}}</span>
+          </a>
+          <a href="{{downloadUrl}}" class="download-link" download>下载</a>
+        </div>
+        {{/packages}}
+
+        {{^packages}}
+        <div class="empty-state">
+          <div class="empty-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+          <p>暂无包</p>
+        </div>
+        {{/packages}}
+      </div>
+{{> html_tail}}

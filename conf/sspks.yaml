@@ -1,0 +1,34 @@
+# SSPKS Configuration
+# Site configuration
+site:
+  name: "Simple SPK Server"
+  theme: "material"
+  redirectindex: ""
+
+# Packages configuration
+packages:
+  file_mask: "*.spk"
+  maintainer: ""
+  maintainer_url: ""
+  distributor: ""
+  distributor_url: ""
+  support_url: ""
+
+# Paths configuration
+paths:
+  cache: "cache/"
+  models: "conf/synology_models.yaml"
+  packages: "packages/"
+  themes: "themes/"
+
+# Excluded Synology services (for dependency resolution)
+excludedSynoServices:
+  - apache-sys
+  - apache-web
+  - mdns
+  - samba
+  - db
+  - applenetwork
+  - cron
+  - nfs
+  - firewall

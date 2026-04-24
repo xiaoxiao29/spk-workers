@@ -1,0 +1,30 @@
+"$schema" = "./node_modules/wrangler/config-schema.json"
+name = "spk-workers"
+main = "src/index.ts"
+compatibility_date = "2026-04-13"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+logs = { head_sampling_rate = 1 }
+
+[[r2_buckets]]
+binding = "SPKS_BUCKET"
+bucket_name = "spks"
+
+[[kv_namespaces]]
+binding = "SPKS_CACHE"
+id = "your-kv-namespace-id"
+
+[[d1_databases]]
+binding = "SPKS_DB"
+database_name = "spks"
+database_id = "your-d1-database-id"
+
+[vars]
+SSPKS_SITE_NAME = "Simple SPK Server"
+SSPKS_SITE_THEME = "sspks"
+SSPKS_STORAGE_BACKEND = "hybrid"
+SSPKS_PACKAGES_FILE_MASK = "*.spk"
+SSPKS_API_KEY = "Your API key"
+SSPKS_EXTERNAL_STORAGE_URL = "Public Domain"

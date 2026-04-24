@@ -1,0 +1,41 @@
+# SPK Workers 环境变量配置
+# 复制此文件为 .dev.vars 并填入实际值
+
+# ====================
+# 站点配置
+# ====================
+
+# 网站显示名称
+SSPKS_SITE_NAME="Simple SPK Server"
+
+# 主题 (sspks, material)
+SSPKS_SITE_THEME="sspks"
+
+# 站点重定向 (可选)
+# 如果设置，访问根路径时重定向到指定地址
+# SSPKS_SITE_REDIRECTINDEX="https://example.com"
+
+# ====================
+# 包配置
+# ====================
+
+# 包文件匹配规则
+SSPKS_PACKAGES_FILE_MASK="*.spk"
+
+# ====================
+# 存储配置
+# ====================
+
+# 存储后端选择：d1, kv, hybrid
+# 推荐使用 d1，读取配额更高 (5M/天 vs 100K/天)
+SSPKS_STORAGE_BACKEND="d1"
+SSPKS_EXTERNAL_STORAGE_URL="public-domain"
+
+# ====================
+# 安全配置
+# ====================
+
+# API 密钥 (必需)
+# 用于保护上传接口，请使用强密码
+# ⚠️ 生产环境请使用 wrangler secret put SSPKS_API_KEY 设置
+# SSPKS_API_KEY="your-api-key-here"

@@ -1,0 +1,68 @@
+{{> html_head}}
+      <script>
+        (function() {
+          document.addEventListener('click', function(e) {
+            const archMatch = e.target.closest('[data-package]');
+            if (archMatch) {
+              const urlParams = new URLSearchParams(window.location.search);
+              const arch = urlParams.get('arch');
+              if (arch) {
+                document.cookie = 'sspks_last_arch=' + encodeURIComponent(arch) + '; path=/; max-age=86400';
+              }
+            }
+          });
+        })();
+      </script>
+      <div class="page-header">
+        <a href="{{baseUrlRelative}}" class="back-link">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          返回设备列表
+        </a>
+        <div class="page-header-content">
+          <h1 class="page-title">{{family}} 架构</h1>
+          <p class="page-subtitle">{{packageCount}} 个可用的 Synology 套件</p>
+        </div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search-box">
+          <input type="text" id="searchInput" placeholder="搜索包..." autocomplete="off">
+        </div>
+        <div class="package-count">
+          共 <strong>{{packageCount}}</strong> 个包
+        </div>
+      </div>
+
+      <div class="package-grid" data-package-list>
+        {{#packages}}
+        <a href="{{baseUrlRelative}}package/{{package}}" class="package-card" data-package="{{package}}" data-description="{{description}}">
+          <img src="{{thumbnail}}" alt="{{displayname}}" class="package-icon">
+          <div class="package-content">
+            <div class="package-header">
+              <h3 class="package-name">{{displayname}}</h3>
+              <span class="package-version">v{{version}}</span>
+            </div>
+            <p class="package-description">{{description}}</p>
+            <div class="package-tags">
+              <span class="tag arch">{{arch}}</span>
+              {{#beta}}<span class="tag beta">Beta</span>{{/beta}}
+            </div>
+          </div>
+        </a>
+        {{/packages}}
+
+        {{^packages}}
+        <div class="empty-state" data-empty-state>
+          <div class="empty-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+          <h3>暂无包</h3>
+          <p>该架构下没有可用的套件</p>
+        </div>
+        {{/packages}}
+      </div>
+{{> html_tail}}

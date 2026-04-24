@@ -1,0 +1,83 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  NODE_VERSION: '18'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      deployments: write
+    env:
+      KV_NAMESPACE_ID: ${{ secrets.KV_NAMESPACE_ID }}
+      D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
+      SITE_NAME: ${{ secrets.SITE_NAME }}
+      SITE_THEME: ${{ secrets.SITE_THEME || 'sspks' }}
+      STORAGE_BACKEND: ${{ secrets.STORAGE_BACKEND || 'd1' }}
+      PACKAGES_FILE_MASK: ${{ secrets.PACKAGES_FILE_MASK || '*.spk' }}
+      API_KEY: ${{ secrets.API_KEY }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          kvNamespaceId: ${{ env.KV_NAMESPACE_ID }}
+          d1DatabaseId: ${{ env.D1_DATABASE_ID }}
+          variables: |
+            SSPKS_SITE_NAME: ${{ env.SITE_NAME }}
+            SSPKS_SITE_THEME: ${{ env.SITE_THEME }}
+            SSPKS_STORAGE_BACKEND: ${{ env.STORAGE_BACKEND }}
+            SSPKS_PACKAGES_FILE_MASK: ${{ env.PACKAGES_FILE_MASK }}
+          secrets: |
+            SSPKS_API_KEY: ${{ env.API_KEY }}
+
+      - name: Upload static assets to R2
+        run: |
+          npx wrangler r2 object put "spks/public/js/spk-parser.js" --file ./public/js/spk-parser.js
+          npx wrangler r2 object put "spks/public/js/upload.js" --file ./public/js/upload.js
+          npx wrangler r2 object put "spks/themes/${{ env.SITE_THEME }}/css/style.css" --file ./themes/${{ env.SITE_THEME }}/css/style.css
+          npx wrangler r2 object put "spks/themes/${{ env.SITE_THEME }}/js/script.js" --file ./themes/${{ env.SITE_THEME }}/js/script.js
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Clear KV cache
+        run: |
+          npx wrangler kv key delete "static:public/js/spk-parser.js" --namespace-id ${{ env.KV_NAMESPACE_ID }}
+          npx wrangler kv key delete "static:public/js/upload.js" --namespace-id ${{ env.KV_NAMESPACE_ID }}
+          npx wrangler kv key delete "static:themes/${{ env.SITE_THEME }}/css/style.css" --namespace-id ${{ env.KV_NAMESPACE_ID }}
+          npx wrangler kv key delete "static:themes/${{ env.SITE_THEME }}/js/script.js" --namespace-id ${{ env.KV_NAMESPACE_ID }}
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
