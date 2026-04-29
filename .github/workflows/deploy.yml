@@ -18,8 +18,35 @@ env:
   NODE_VERSION: '20'
 
 jobs:
-  deploy:
+  test-and-build:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install rolldown Linux binding (CI fix)
+        run: npm install @rolldown/binding-linux-x64-gnu --save-optional
+        if: runner.os == 'Linux'
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run tests
+        run: npm test
+
+  deploy:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     environment: ${{ github.event.inputs.environment || 'production' }}
     permissions:
       contents: read
@@ -53,17 +80,12 @@ jobs:
       - name: Build project
         run: npm run build
 
-      - name: Run tests
-        run: npm test
-
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          kvNamespaceId: ${{ env.KV_NAMESPACE_ID }}
-          d1DatabaseId: ${{ env.D1_DATABASE_ID }}
-          variables: |
+          vars: |
             SSPKS_SITE_NAME: ${{ env.SITE_NAME }}
             SSPKS_SITE_THEME: ${{ env.SITE_THEME }}
             SSPKS_STORAGE_BACKEND: ${{ env.STORAGE_BACKEND }}
