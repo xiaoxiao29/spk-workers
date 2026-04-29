@@ -1,0 +1,17 @@
+name = "spk-workers"
+main = "src/index.ts"
+compatibility_date = "2024-04-01"
+
+[vars]
+SSPKS_SITE_NAME = "SPK Server"
+SSPKS_SITE_THEME = "sspks"
+SSPKS_STORAGE_BACKEND = "d1"
+SSPKS_PACKAGES_FILE_MASK = "*.spk"
+SSPKS_API_KEY = "ci-test-key"
+
+[d1_databases]
+SPKS_DB = { binding = "SPKS_DB", database_name = "spk-workers-db", database_id = "00000000-0000-0000-0000-000000000000" }
+
+[[kv_namespaces]]
+binding = "SPKS_CACHE"
+id = "000000000000000000000000000000000000000000000000000000000000000000"
