@@ -9,8 +9,10 @@ SSPKS_STORAGE_BACKEND = "d1"
 SSPKS_PACKAGES_FILE_MASK = "*.spk"
 SSPKS_API_KEY = "ci-test-key"
 
-[d1_databases]
-SPKS_DB = { binding = "SPKS_DB", database_name = "spk-workers-db", database_id = "00000000-0000-0000-0000-000000000000" }
+[[d1_databases]]
+binding = "SPKS_DB"
+database_name = "spk-workers-db"
+database_id = "00000000-0000-0000-0000-000000000000"
 
 [[kv_namespaces]]
 binding = "SPKS_CACHE"
