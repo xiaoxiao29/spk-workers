@@ -46,6 +46,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Install rolldown Linux binding (CI fix)
+        run: npm install @rolldown/binding-linux-x64-gnu --save-optional
+        if: runner.os == 'Linux'
+
       - name: Build project
         run: npm run build
 
