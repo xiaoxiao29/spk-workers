@@ -29,7 +29,8 @@ workers-site/
 .env.test.local
 .env.production.local
 .env.*.local
-wrangler.toml
+# wrangler.toml - added to repo for CI test config
+# See .dev.vars for local secret overrides
 
 # ===========================
 # IDE
