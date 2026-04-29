@@ -56,6 +56,13 @@ export class IconHandler extends AbstractHandler {
       );
     }
 
+    if (!await this.validateImageFile(iconFile)) {
+      return this.json(
+        { error: { code: "INVALID_IMAGE", message: "Only PNG and JPEG images are allowed" } },
+        { status: 400 }
+      );
+    }
+
     const displayName = formData.get("displayname") as string | null;
     if (!displayName) {
       return this.json(
@@ -82,10 +89,7 @@ export class IconHandler extends AbstractHandler {
       });
     } catch (e) {
       console.error("Icon upload failed:", e);
-      return this.json(
-        { error: { code: "UPLOAD_FAILED", message: String(e) } },
-        { status: 500 }
-      );
+      return this.safeErrorResponse(e, 500);
     }
   }
 
@@ -105,6 +109,13 @@ export class IconHandler extends AbstractHandler {
       );
     }
 
+    if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+      return this.json(
+        { error: { code: "INVALID_NAME", message: "Invalid icon name" } },
+        { status: 400 }
+      );
+    }
+
     const iconKey = `${this.ICONS_PREFIX}${name}.png`;
 
     try {
@@ -116,20 +127,31 @@ export class IconHandler extends AbstractHandler {
         );
       }
 
-      const arrayBuffer = await obj.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      const mimeType = obj.httpMetadata?.contentType || "image/png";
+      const headers = new Headers();
+      headers.set("Content-Type", obj.httpMetadata?.contentType || "image/png");
+      headers.set("Cache-Control", "public, max-age=86400");
 
-      return this.json({
-        success: true,
-        icon_url: `data:${mimeType};base64,${base64}`
-      });
+      return new Response(obj.body, { status: 200, headers });
     } catch (e) {
       console.error("Icon fetch failed:", e);
-      return this.json(
-        { error: { code: "FETCH_FAILED", message: String(e) } },
-        { status: 500 }
-      );
+      return this.safeErrorResponse(e, 500);
+    }
+  }
+
+  private async validateImageFile(file: File): Promise<boolean> {
+    try {
+      const buffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(buffer.slice(0, 8));
+
+      if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+        return true;
+      }
+      if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
   }
 }

@@ -10,6 +10,7 @@ export class CacheKeyBuilder {
     PACKAGE_LIST: 'index:arch',
     ALL_INDEX: 'index:all',
     PACKAGE_DETAIL: 'packages:detail',
+    ARCH_PACKAGE_LIST: 'list:arch',
     ICON: 'static:icons',
     DEVICE_CONFIG: 'config:models',
     ASSET: 'static:assets',
@@ -49,6 +50,10 @@ export class CacheKeyBuilder {
    */
   static forPackageDetail(name: string): string {
     return `${this.PREFIX.PACKAGE_DETAIL}:${name}`;
+  }
+
+  static forArchPackageList(arch: string): string {
+    return `${this.PREFIX.ARCH_PACKAGE_LIST}:${arch}`;
   }
 
   /**

@@ -7,6 +7,8 @@
 /**
  * Handler 接口
  */
+import { shouldCompress } from "../utils/Compression";
+
 export interface HandlerInterface {
   /**
    * 检查是否能处理该请求
@@ -37,6 +39,26 @@ export abstract class AbstractHandler implements HandlerInterface {
    * 创建 JSON 响应
    */
   protected json(data: unknown, init?: ResponseInit): Response {
+    const json = JSON.stringify(data);
+    const contentLength = new TextEncoder().encode(json).length;
+
+    if (shouldCompress("application/json", contentLength)) {
+      const stream = new CompressionStream("gzip");
+      const writer = stream.writable.getWriter();
+      void writer.write(new TextEncoder().encode(json));
+      void writer.close();
+
+      return new Response(stream.readable, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Encoding": "gzip",
+          "Vary": "Accept-Encoding",
+          ...init?.headers,
+        },
+      });
+    }
+
     return Response.json(data, {
       ...init,
       headers: {
@@ -92,5 +114,26 @@ export abstract class AbstractHandler implements HandlerInterface {
     ]);
 
     return crypto.subtle.timingSafeEqual(providedHash, expectedHash);
+  }
+
+  protected safeErrorResponse(error: unknown, status: number = 500): Response {
+    console.error("Request error:", error);
+    return Response.json(
+      { error: { code: "INTERNAL_ERROR", message: "An internal error occurred" } },
+      { status }
+    );
+  }
+
+  protected static readonly PACKAGE_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
+  protected isValidPackageName(name: string): boolean {
+    return AbstractHandler.PACKAGE_NAME_PATTERN.test(name);
+  }
+
+  protected isValidDownloadPath(key: string): boolean {
+    if (!key.startsWith("packages/")) return false;
+    if (key.includes("..")) return false;
+    if (key.includes("\0")) return false;
+    return true;
   }
 }

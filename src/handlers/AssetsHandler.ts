@@ -46,28 +46,44 @@ export class AssetsHandler implements HandlerInterface {
     }
 
     try {
-      const cacheKey = CacheKeyBuilder.forAsset(assetPath);
-      const cached = await env.SPKS_CACHE.get(cacheKey);
-      if (cached) {
-        return new Response(cached, {
+      const cache = caches.default;
+      const cacheKey = new Request(url.toString());
+      const cachedResponse = await cache.match(cacheKey);
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      const kvCacheKey = CacheKeyBuilder.forAsset(assetPath);
+      const kvCached = await env.SPKS_CACHE.get(kvCacheKey);
+      if (kvCached) {
+        const response = new Response(kvCached, {
           headers: this.getHeaders(assetPath),
         });
+        try {
+          await cache.put(cacheKey, response.clone());
+        } catch { /* Cache API may not be available in all environments */ }
+        return response;
       }
 
       const obj = await env.SPKS_BUCKET.get(assetPath);
       if (!obj) {
-        return new Response("Not Found", { 
+        return new Response("Not Found", {
           status: 404,
           headers: { "Content-Type": this.getMimeType(assetPath) }
         });
       }
 
       const content = await obj.arrayBuffer();
-      await env.SPKS_CACHE.put(cacheKey, content, { expirationTtl: CACHE_TTL.STATIC_ASSETS });
+      await env.SPKS_CACHE.put(kvCacheKey, content, { expirationTtl: CACHE_TTL.STATIC_ASSETS });
 
-      return new Response(content, {
+      const response = new Response(content, {
         headers: this.getHeaders(assetPath),
       });
+      try {
+        await cache.put(cacheKey, response.clone());
+      } catch { /* Cache API may not be available in all environments */ }
+
+      return response;
     } catch (e) {
       console.error("Assets error:", e);
       return new Response("Internal Error", { status: 500 });

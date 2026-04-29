@@ -35,7 +35,14 @@ export class UploadPageHandler extends AbstractHandler {
   /**
    * 处理请求
    */
-  async handle(_request: Request, _env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async handle(request: Request, _env: Env, _ctx: ExecutionContext): Promise<Response> {
+    const apiKey = request.headers.get("X-API-Key") ||
+      new URL(request.url).searchParams.get("api_key");
+
+    if (!apiKey || !_env.SSPKS_API_KEY) {
+      return this.htmlOutput.response("html_upload", { authRequired: true });
+    }
+
     return this.htmlOutput.response("html_upload", {});
   }
 }

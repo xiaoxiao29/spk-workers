@@ -205,10 +205,7 @@ export class UploadHandler extends AbstractHandler {
       return this.json(response);
     } catch (e) {
       console.error("Upload failed:", e);
-      return this.json(
-        { error: { code: "UPLOAD_FAILED", message: String(e) } },
-        { status: 500 }
-      );
+      return this.safeErrorResponse(e, 500);
     }
   }
 

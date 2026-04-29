@@ -35,91 +35,97 @@ export class HybridStorage implements IStorage {
       .bind(packageName)
       .first();
 
-    if (existing) {
-      await db
-        .prepare(`
-          UPDATE packages SET
-            r2_key = ?,
-            version = ?,
-            displayname = ?,
-            description = ?,
-            maintainer = ?,
-            maintainer_url = ?,
-            distributor = ?,
-            distributor_url = ?,
-            helpurl = ?,
-            arch = ?,
-            firmware = ?,
-            beta = ?,
-            thumbnail_url = ?,
-            size = ?,
-            checksum = ?,
-            updated_at = ?
-          WHERE id = ?
-        `)
-        .bind(
-          r2Key,
-          metadata.version || "unknown",
-          metadata.displayname || packageName,
-          metadata.description || "",
-          metadata.maintainer || null,
-          metadata.maintainer_url || null,
-          metadata.distributor || null,
-          metadata.distributor_url || null,
-          metadata.helpurl || null,
-          JSON.stringify(archs),
-          metadata.firmware || null,
-          metadata.beta ? 1 : 0,
-          metadata.thumbnail_url?.[0] || "",
-          metadata.size || 0,
-          metadata.checksum || "",
-          now,
-          packageName
-        )
-        .run();
-    } else {
-      await db
-        .prepare(`
-          INSERT INTO packages (id, r2_key, version, displayname, description, maintainer, maintainer_url, distributor, distributor_url, helpurl, arch, firmware, beta, thumbnail_url, size, checksum, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-        .bind(
-          packageName,
-          r2Key,
-          metadata.version || "unknown",
-          metadata.displayname || packageName,
-          metadata.description || "",
-          metadata.maintainer || null,
-          metadata.maintainer_url || null,
-          metadata.distributor || null,
-          metadata.distributor_url || null,
-          metadata.helpurl || null,
-          JSON.stringify(archs),
-          metadata.firmware || null,
-          metadata.beta ? 1 : 0,
-          metadata.thumbnail_url?.[0] || "",
-          metadata.size || 0,
-          metadata.checksum || "",
-          now,
-          now
-        )
-        .run();
-    }
-
-    await db
-      .prepare("DELETE FROM package_arch WHERE package_id = ?")
-      .bind(packageName)
-      .run();
-
     const uniqueArchs = [...new Set(archs)];
     const allArchs = uniqueArchs.includes("noarch") ? uniqueArchs : [...uniqueArchs, "noarch"];
 
-    for (const arch of allArchs) {
-      await db
-        .prepare("INSERT OR IGNORE INTO package_arch (package_id, arch) VALUES (?, ?)")
-        .bind(packageName, arch)
-        .run();
+    const batch: D1PreparedStatement[] = [];
+
+    if (existing) {
+      batch.push(
+        db
+          .prepare(`
+            UPDATE packages SET
+              r2_key = ?,
+              version = ?,
+              displayname = ?,
+              description = ?,
+              maintainer = ?,
+              maintainer_url = ?,
+              distributor = ?,
+              distributor_url = ?,
+              helpurl = ?,
+              arch = ?,
+              firmware = ?,
+              beta = ?,
+              thumbnail_url = ?,
+              size = ?,
+              checksum = ?,
+              updated_at = ?
+            WHERE id = ?
+          `)
+          .bind(
+            r2Key,
+            metadata.version || "unknown",
+            metadata.displayname || packageName,
+            metadata.description || "",
+            metadata.maintainer || null,
+            metadata.maintainer_url || null,
+            metadata.distributor || null,
+            metadata.distributor_url || null,
+            metadata.helpurl || null,
+            JSON.stringify(archs),
+            metadata.firmware || null,
+            metadata.beta ? 1 : 0,
+            metadata.thumbnail_url?.[0] || "",
+            metadata.size || 0,
+            metadata.checksum || "",
+            now,
+            packageName
+          )
+      );
+    } else {
+      batch.push(
+        db
+          .prepare(`
+            INSERT INTO packages (id, r2_key, version, displayname, description, maintainer, maintainer_url, distributor, distributor_url, helpurl, arch, firmware, beta, thumbnail_url, size, checksum, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `)
+          .bind(
+            packageName,
+            r2Key,
+            metadata.version || "unknown",
+            metadata.displayname || packageName,
+            metadata.description || "",
+            metadata.maintainer || null,
+            metadata.maintainer_url || null,
+            metadata.distributor || null,
+            metadata.distributor_url || null,
+            metadata.helpurl || null,
+            JSON.stringify(archs),
+            metadata.firmware || null,
+            metadata.beta ? 1 : 0,
+            metadata.thumbnail_url?.[0] || "",
+            metadata.size || 0,
+            metadata.checksum || "",
+            now,
+            now
+          )
+      );
     }
+
+    batch.push(
+      db.prepare("DELETE FROM package_arch WHERE package_id = ?").bind(packageName)
+    );
+
+    for (const arch of allArchs) {
+      batch.push(
+        db
+          .prepare("INSERT OR IGNORE INTO package_arch (package_id, arch) VALUES (?, ?)")
+          .bind(packageName, arch)
+      );
+    }
+
+    await db.batch(batch);
 
     await this.invalidateCache(env, packageName);
   }
@@ -133,8 +139,10 @@ export class HybridStorage implements IStorage {
       .all();
     const dbArchs = archResult.results.map((row) => row.arch as string);
 
-    await db.prepare("DELETE FROM package_arch WHERE package_id = ?").bind(packageName).run();
-    await db.prepare("DELETE FROM packages WHERE id = ?").bind(packageName).run();
+    await db.batch([
+      db.prepare("DELETE FROM package_arch WHERE package_id = ?").bind(packageName),
+      db.prepare("DELETE FROM packages WHERE id = ?").bind(packageName),
+    ]);
 
     await this.invalidateCache(env, packageName, dbArchs);
   }
@@ -159,24 +167,26 @@ export class HybridStorage implements IStorage {
     arch: string,
     baseUrl: string
   ): Promise<PackageInfo[]> {
-    const cachedNames = await IndexManager.getArchIndex(env, arch);
-    if (cachedNames.length > 0) {
-      const packages: PackageInfo[] = [];
-      for (const name of cachedNames) {
-        const pkg = await this.getFromKV(env, name);
-        if (pkg) {
-          pkg.metadata.spk_url = `${baseUrl}/packages/${pkg.filename}`;
-          packages.push(pkg);
-        }
-      }
-      if (packages.length > 0) {
-        return packages.filter(pkg =>
-          pkg.metadata.arch.includes(arch) || pkg.metadata.arch.includes("noarch")
-        );
-      }
+    const archListKey = CacheKeyBuilder.forArchPackageList(arch);
+    const cachedList = await env.SPKS_CACHE.get(archListKey, { type: "json" });
+    if (cachedList && Array.isArray(cachedList)) {
+      const packages = cachedList as PackageInfo[];
+      return packages.map(pkg => {
+        pkg.metadata.spk_url = `${baseUrl}/packages/${pkg.filename}`;
+        return pkg;
+      });
     }
 
     const fromD1 = await this.getPackagesByArchFromD1(env, arch, baseUrl);
+
+    try {
+      await env.SPKS_CACHE.put(archListKey, JSON.stringify(fromD1), {
+        expirationTtl: CACHE_TTL.PACKAGE_LIST,
+      });
+    } catch (e) {
+      console.warn("Failed to cache arch package list:", e);
+    }
+
     for (const pkg of fromD1) {
       await this.cacheToKV(env, pkg.metadata.package, pkg);
     }
@@ -283,14 +293,16 @@ export class HybridStorage implements IStorage {
       { expirationTtl: CACHE_TTL.PACKAGE_DETAIL }
     );
 
+    const indexPromises: Promise<void>[] = [];
     for (const arch of cacheData.archs) {
-      await IndexManager.addToArchIndex(env, arch, packageName);
+      indexPromises.push(IndexManager.addToArchIndex(env, arch, packageName));
     }
     if (!cacheData.archs.includes("noarch")) {
-      await IndexManager.addToArchIndex(env, "noarch", packageName);
+      indexPromises.push(IndexManager.addToArchIndex(env, "noarch", packageName));
     }
+    indexPromises.push(IndexManager.addToAllIndex(env, packageName));
 
-    await IndexManager.addToAllIndex(env, packageName);
+    await Promise.all(indexPromises);
   }
 
   private async invalidateCache(env: Env, packageName: string, dbArchs: string[] = []): Promise<void> {
@@ -313,14 +325,22 @@ export class HybridStorage implements IStorage {
 
     await env.SPKS_CACHE.delete(cacheKey);
 
+    const allArchs = archs.includes("noarch") ? archs : [...archs, "noarch"];
+    const deletePromises = allArchs.map(arch =>
+      env.SPKS_CACHE.delete(CacheKeyBuilder.forArchPackageList(arch))
+    );
+    deletePromises.push(env.SPKS_CACHE.delete(CacheKeyBuilder.forArchPackageList("noarch")));
+
     for (const arch of archs) {
-      await IndexManager.removeFromArchIndex(env, arch, packageName);
+      deletePromises.push(IndexManager.removeFromArchIndex(env, arch, packageName));
     }
     if (!archs.includes("noarch")) {
-      await IndexManager.removeFromArchIndex(env, "noarch", packageName);
+      deletePromises.push(IndexManager.removeFromArchIndex(env, "noarch", packageName));
     }
 
-    await IndexManager.removeFromAllIndex(env, packageName);
+    deletePromises.push(IndexManager.removeFromAllIndex(env, packageName));
+
+    await Promise.all(deletePromises);
   }
 
   private async getPackagesByArchFromD1(

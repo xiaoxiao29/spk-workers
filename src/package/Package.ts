@@ -39,7 +39,7 @@ export function normalizeArchs(arch: string | string[] | undefined | null): stri
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) return parsed;
     } catch {
-      // Not a valid JSON array, fall through to space splitting
+      // not a valid JSON array
     }
   }
   return trimmed.split(/\s+/).filter(Boolean);
@@ -58,11 +58,6 @@ export interface CacheData {
   metadata: Partial<PackageMetadata>;
   updated: number;
   archs: string[];
-}
-
-interface ArchIndex {
-  packages: string[];
-  updated: number;
 }
 
 export class Package {
@@ -132,7 +127,6 @@ export class Package {
     env: Env
   ): Promise<PackageInfo | null> {
     const filename = obj.key.replace(config.packagesPath, "");
-
     const packageName = filename.replace(".spk", "").split("-").slice(0, -1).join("-") || filename.replace(".spk", "");
 
     const cached = await this.fromCache(env, packageName);
@@ -175,7 +169,6 @@ export class Package {
   isCompatibleToFirmware(firmware: string): boolean {
     const required = this.metadata.firmware;
     if (!required) return true;
-
     return this.compareFirmware(firmware, required) >= 0;
   }
 
@@ -184,10 +177,8 @@ export class Package {
       const parts = v.split(".").map(Number);
       return { major: parts[0] || 0, minor: parts[1] || 0 };
     };
-
     const c = parse(current);
     const r = parse(required);
-
     if (c.major !== r.major) return c.major - r.major;
     return c.minor - r.minor;
   }
@@ -198,6 +189,9 @@ export class Package {
     r2Key: string,
     metadata: Partial<PackageMetadata>
   ): Promise<void> {
+    const { IndexManager } = await import("../db/IndexManager");
+    const { CacheKeyBuilder, CACHE_TTL } = await import("../utils/CacheKeyBuilder");
+
     const now = Date.now();
     const archs = normalizeArchs(metadata.arch);
 
@@ -209,74 +203,53 @@ export class Package {
     };
 
     await env.SPKS_CACHE.put(
-      `pkg:${packageName}`,
-      JSON.stringify(cacheData)
+      CacheKeyBuilder.forPackage(packageName),
+      JSON.stringify(cacheData),
+      { expirationTtl: CACHE_TTL.PACKAGE_DETAIL }
     );
 
+    const promises: Promise<void>[] = [];
     for (const arch of archs) {
-      await this.addToArchIndex(env, arch, packageName);
+      promises.push(IndexManager.addToArchIndex(env, arch, packageName));
     }
     if (!archs.includes("noarch")) {
-      await this.addToArchIndex(env, "noarch", packageName);
+      promises.push(IndexManager.addToArchIndex(env, "noarch", packageName));
     }
-
-    await this.addToAllIndex(env, packageName);
+    promises.push(IndexManager.addToAllIndex(env, packageName));
+    await Promise.all(promises);
   }
 
   static async deleteFromCache(
     env: Env,
     packageName: string
   ): Promise<void> {
-    const cacheKey = `pkg:${packageName}`;
+    const { IndexManager } = await import("../db/IndexManager");
+    const { CacheKeyBuilder } = await import("../utils/CacheKeyBuilder");
+
+    const cacheKey = CacheKeyBuilder.forPackage(packageName);
     const cacheValue = await env.SPKS_CACHE.get(cacheKey);
 
     if (cacheValue) {
       const cacheData: CacheData = JSON.parse(cacheValue);
       const archs = cacheData.archs || [];
 
+      const promises: Promise<void>[] = [];
       for (const arch of archs) {
-        await this.removeFromArchIndex(env, arch, packageName);
+        promises.push(IndexManager.removeFromArchIndex(env, arch, packageName));
       }
       if (!archs.includes("noarch")) {
-        await this.removeFromArchIndex(env, "noarch", packageName);
+        promises.push(IndexManager.removeFromArchIndex(env, "noarch", packageName));
       }
-
-      await this.removeFromAllIndex(env, packageName);
+      promises.push(IndexManager.removeFromAllIndex(env, packageName));
+      await Promise.all(promises);
     }
 
     await env.SPKS_CACHE.delete(cacheKey);
   }
 
-  private static async getArchIndex(env: Env, arch: string): Promise<string[]> {
-    const indexKey = `index:arch:${arch}`;
-    const indexValue = await env.SPKS_CACHE.get(indexKey);
-
-    if (!indexValue) {
-      return [];
-    }
-
-    try {
-      const index: ArchIndex = JSON.parse(indexValue);
-      return index.packages || [];
-    } catch {
-      return [];
-    }
-  }
-
   static async getAllPackageNames(env: Env): Promise<string[]> {
-    const indexKey = `index:all`;
-    const indexValue = await env.SPKS_CACHE.get(indexKey);
-
-    if (!indexValue) {
-      return [];
-    }
-
-    try {
-      const index: ArchIndex = JSON.parse(indexValue);
-      return index.packages || [];
-    } catch {
-      return [];
-    }
+    const { IndexManager } = await import("../db/IndexManager");
+    return IndexManager.getAllIndex(env);
   }
 
   static async getPackagesByArch(
@@ -284,14 +257,14 @@ export class Package {
     arch: string,
     baseUrl: string
   ): Promise<PackageInfo[]> {
-    const packageNames = await this.getArchIndex(env, arch);
+    const { IndexManager } = await import("../db/IndexManager");
 
+    const packageNames = await IndexManager.getArchIndex(env, arch);
     if (packageNames.length === 0) {
       return [];
     }
 
     const packages: PackageInfo[] = [];
-
     for (const name of packageNames) {
       const pkg = await this.fromCache(env, name);
       if (pkg) {
@@ -303,95 +276,5 @@ export class Package {
     return packages.filter(pkg =>
       pkg.metadata.arch.includes(arch) || pkg.metadata.arch.includes("noarch")
     );
-  }
-
-  private static async addToArchIndex(
-    env: Env,
-    arch: string,
-    packageName: string
-  ): Promise<void> {
-    const indexKey = `index:arch:${arch}`;
-    const indexValue = await env.SPKS_CACHE.get(indexKey);
-    const now = Date.now();
-
-    let index: ArchIndex;
-    if (indexValue) {
-      index = JSON.parse(indexValue);
-      if (!index.packages.includes(packageName)) {
-        index.packages.push(packageName);
-      }
-      index.updated = now;
-    } else {
-      index = { packages: [packageName], updated: now };
-    }
-
-    await env.SPKS_CACHE.put(indexKey, JSON.stringify(index));
-  }
-
-  private static async removeFromArchIndex(
-    env: Env,
-    arch: string,
-    packageName: string
-  ): Promise<void> {
-    const indexKey = `index:arch:${arch}`;
-    const indexValue = await env.SPKS_CACHE.get(indexKey);
-
-    if (!indexValue) {
-      return;
-    }
-
-    const index: ArchIndex = JSON.parse(indexValue);
-    index.packages = index.packages.filter(p => p !== packageName);
-    index.updated = Date.now();
-
-    if (index.packages.length > 0) {
-      await env.SPKS_CACHE.put(indexKey, JSON.stringify(index));
-    } else {
-      await env.SPKS_CACHE.delete(indexKey);
-    }
-  }
-
-  private static async addToAllIndex(
-    env: Env,
-    packageName: string
-  ): Promise<void> {
-    const indexKey = `index:all`;
-    const indexValue = await env.SPKS_CACHE.get(indexKey);
-    const now = Date.now();
-
-    let index: ArchIndex;
-    if (indexValue) {
-      index = JSON.parse(indexValue);
-      if (!index.packages.includes(packageName)) {
-        index.packages.push(packageName);
-      }
-      index.updated = now;
-    } else {
-      index = { packages: [packageName], updated: now };
-    }
-
-    await env.SPKS_CACHE.put(indexKey, JSON.stringify(index));
-  }
-
-  private static async removeFromAllIndex(
-    env: Env,
-    packageName: string
-  ): Promise<void> {
-    const indexKey = `index:all`;
-    const indexValue = await env.SPKS_CACHE.get(indexKey);
-
-    if (!indexValue) {
-      return;
-    }
-
-    const index: ArchIndex = JSON.parse(indexValue);
-    index.packages = index.packages.filter(p => p !== packageName);
-    index.updated = Date.now();
-
-    if (index.packages.length > 0) {
-      await env.SPKS_CACHE.put(indexKey, JSON.stringify(index));
-    } else {
-      await env.SPKS_CACHE.delete(indexKey);
-    }
   }
 }

@@ -56,14 +56,16 @@ export class KVStorage implements IStorage {
 
     await env.SPKS_CACHE.delete(cacheKey);
 
+    const deletePromises: Promise<void>[] = [];
     for (const arch of archs) {
-      await IndexManager.removeFromArchIndex(env, arch, packageName);
+      deletePromises.push(IndexManager.removeFromArchIndex(env, arch, packageName));
     }
     if (!archs.includes("noarch")) {
-      await IndexManager.removeFromArchIndex(env, "noarch", packageName);
+      deletePromises.push(IndexManager.removeFromArchIndex(env, "noarch", packageName));
     }
+    deletePromises.push(IndexManager.removeFromAllIndex(env, packageName));
 
-    await IndexManager.removeFromAllIndex(env, packageName);
+    await Promise.all(deletePromises);
   }
 
   async getPackage(env: Env, packageName: string): Promise<PackageInfo | null> {
@@ -120,14 +122,22 @@ export class KVStorage implements IStorage {
     arch: string,
     baseUrl: string
   ): Promise<PackageInfo[]> {
-    const allNames = await this.getAllPackageNames(env);
+    const archListKey = CacheKeyBuilder.forArchPackageList(arch);
+    const cachedList = await env.SPKS_CACHE.get(archListKey, { type: "json" });
+    if (cachedList && Array.isArray(cachedList)) {
+      const packages = cachedList as PackageInfo[];
+      return packages.map(pkg => {
+        pkg.metadata.spk_url = `${baseUrl}/packages/${pkg.filename}`;
+        return pkg;
+      });
+    }
 
+    const allNames = await this.getAllPackageNames(env);
     if (allNames.length === 0) {
       return [];
     }
 
     const packages: PackageInfo[] = [];
-
     for (const name of allNames) {
       const pkg = await this.getPackage(env, name);
       if (pkg) {
@@ -137,6 +147,14 @@ export class KVStorage implements IStorage {
           packages.push(pkg);
         }
       }
+    }
+
+    try {
+      await env.SPKS_CACHE.put(archListKey, JSON.stringify(packages), {
+        expirationTtl: CACHE_TTL.PACKAGE_LIST,
+      });
+    } catch (e) {
+      console.warn("Failed to cache arch package list:", e);
     }
 
     return packages;

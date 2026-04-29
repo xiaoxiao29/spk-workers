@@ -67,31 +67,45 @@ export class DeleteHandler extends AbstractHandler {
       }
 
       try {
-        console.log("Starting to recreate tables...");
-        
-        // 重建表结构
+        let body: { confirm?: string } = {};
+        try {
+          body = await request.json() as { confirm?: string };
+        } catch {
+          // body may be empty
+        }
+
+        if (body.confirm !== "DROP_ALL_DATA") {
+          return this.json(
+            { error: { code: "CONFIRMATION_REQUIRED", message: "Send {confirm: 'DROP_ALL_DATA'} to confirm this destructive operation" } },
+            { status: 400 }
+          );
+        }
+
         await this.d1Database.initialize(env, true);
-        
-        console.log("Tables recreated successfully");
-        return this.json({ 
-          success: true, 
+
+        return this.json({
+          success: true,
           message: "Tables recreated successfully. All data has been cleared."
         });
       } catch (e) {
         console.error("Recreate tables failed:", e);
-        return this.json(
-          { error: { code: "RECREATE_FAILED", message: String(e) } },
-          { status: 500 }
-        );
+        return this.safeErrorResponse(e, 500);
       }
     }
 
     // 处理包删除请求
-    const packageName = url.pathname.replace("/api/packages/", "");
+    const packageName = decodeURIComponent(url.pathname.replace("/api/packages/", ""));
 
     if (!packageName) {
       return this.json(
         { error: { code: "INVALID_REQUEST", message: "Package name is required" } },
+        { status: 400 }
+      );
+    }
+
+    if (!this.isValidPackageName(packageName)) {
+      return this.json(
+        { error: { code: "INVALID_PACKAGE_NAME", message: "Package name contains invalid characters" } },
         { status: 400 }
       );
     }
@@ -144,10 +158,7 @@ export class DeleteHandler extends AbstractHandler {
       return this.json(response);
     } catch (e) {
       console.error("Delete failed:", e);
-      return this.json(
-        { error: { code: "DELETE_FAILED", message: String(e) } },
-        { status: 500 }
-      );
+      return this.safeErrorResponse(e, 500);
     }
   }
 

@@ -38,6 +38,10 @@ interface PerformanceMetrics {
 
 /**
  * 全局缓存 - 设备配置
+ *
+ * 注意：Cloudflare Workers 的全局变量不保证在请求间持久。
+ * 不同隔离区（isolate）间不共享，Worker 可能随时被回收重启。
+ * 此缓存仅为"尽力而为"的优化，主要依赖 KV/D1 缓存。
  */
 let cachedDeviceList: DeviceList | null = null;
 let lastDeviceListCacheTime = 0;
@@ -45,6 +49,8 @@ const DEVICE_LIST_CACHE_TTL = 3600000; // 1小时
 
 /**
  * 全局缓存 - Router 实例
+ *
+ * 同上，仅作为冷启动后的优化，不保证持久性。
  */
 let routerInstance: Router | null = null;
 let lastRouterConfig: { baseUrl: string; basePath: string } | null = null;
@@ -174,6 +180,11 @@ export default {
       response.headers.set('X-Response-Time', `${metrics.totalTime}ms`);
       response.headers.set('X-Cache-Status', metrics.cacheHit ? 'HIT' : 'MISS');
 
+      response.headers.set('X-Content-Type-Options', 'nosniff');
+      response.headers.set('X-Frame-Options', 'DENY');
+      response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+      response.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
       if (metrics.totalTime > 500) {
         console.warn('Slow request detected:', {
           path: new URL(request.url).pathname,
@@ -186,7 +197,7 @@ export default {
     } catch (e) {
       console.error("Worker error:", e);
       return Response.json(
-        { error: { code: "INTERNAL_ERROR", message: String(e) } },
+        { error: { code: "INTERNAL_ERROR", message: "An internal error occurred" } },
         { status: 500 }
       );
     }

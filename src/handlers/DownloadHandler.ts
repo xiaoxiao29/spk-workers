@@ -45,18 +45,12 @@ export class DownloadHandler extends AbstractHandler {
    * 设置适当的 Content-Disposition 和缓存头
    * 记录下载统计信息到数据库
    */
-  async handle(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
+  async handle(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const key = decodeURIComponent(url.pathname.replace(/^\//, ""));
     const startTime = Date.now();
 
-    console.log("[Download] ========== 下载请求开始 ==========");
-    console.log(`[Download] 文件路径: ${key}`);
-    console.log(`[Download] 客户端: ${request.headers.get("CF-Connecting-IP") || request.headers.get("X-Forwarded-For") || "unknown"}`);
-    console.log(`[Download] User-Agent: ${request.headers.get("User-Agent") || "unknown"}`);
-    console.log(`[Download] Range: ${request.headers.get("Range") || "(无范围请求)"}`);
-
-    if (!key || key === "packages/") {
+    if (!key || key === "packages/" || !this.isValidDownloadPath(key)) {
       console.error("[Download] ❌ 无效的文件路径");
       return this.json({ error: { code: "INVALID_PATH" } }, { status: 400 });
     }
@@ -85,9 +79,7 @@ export class DownloadHandler extends AbstractHandler {
     console.log(`[Download] 文件大小: ${(object.size / 1024 / 1024).toFixed(2)} MB`);
 
     // 记录下载统计（异步执行，不阻塞响应）
-    this.recordDownload(env, key, request).catch(err => {
-      console.error("[Download] ❌ 记录下载统计失败:", err);
-    });
+    ctx.waitUntil(this.recordDownload(env, key, request));
 
     const headers = new Headers();
     object.writeHttpMetadata(headers);
@@ -148,45 +140,40 @@ export class DownloadHandler extends AbstractHandler {
    */
   private async recordDownload(env: Env, key: string, request: Request): Promise<void> {
     try {
-      // 从文件路径中提取包名（例如：packages/transmission-x86_64-3.0-1.spk -> transmission）
       const filename = key.split("/").pop() || "";
       const packageName = filename.replace(".spk", "").split("-").slice(0, -2).join("-") || filename.replace(".spk", "");
 
-      // 获取客户端 IP 地址
-      const ip = request.headers.get("CF-Connecting-IP") || 
-                 request.headers.get("X-Forwarded-For")?.split(",")[0] || 
+      const rawIp = request.headers.get("CF-Connecting-IP") ||
+                 request.headers.get("X-Forwarded-For")?.split(",")[0] ||
                  "unknown";
 
-      // 获取 User-Agent
+      const ip = this.anonymizeIp(rawIp.trim());
       const userAgent = request.headers.get("User-Agent") || "unknown";
-
-      console.log(`[Download Stats] 记录下载统计:`);
-      console.log(`  - 包名: ${packageName}`);
-      console.log(`  - IP: ${ip.trim()}`);
-      console.log(`  - User-Agent: ${userAgent.substring(0, 50)}${userAgent.length > 50 ? "..." : ""}`);
-
-      // 记录到数据库
       const timestamp = Date.now();
-      
-      await env.SPKS_DB.prepare(
-        "INSERT INTO downloads (package_id, arch, firmware_build, ip_address, user_agent, timestamp) VALUES (?, ?, ?, ?, ?, ?)"
-      ).bind(
-        packageName,
-        null,
-        null,
-        ip.trim(),
-        userAgent,
-        timestamp
-      ).run();
 
-      // 更新包的下载计数
-      await env.SPKS_DB.prepare(
-        "UPDATE packages SET download_count = COALESCE(download_count, 0) + 1 WHERE id = ?"
-      ).bind(packageName).run();
-
-      console.log(`[Download Stats] ✓ 下载统计已记录`);
+      await env.SPKS_DB.batch([
+        env.SPKS_DB.prepare(
+          "INSERT INTO downloads (package_id, arch, firmware_build, ip_address, user_agent, timestamp) VALUES (?, ?, ?, ?, ?, ?)"
+        ).bind(packageName, null, null, ip, userAgent, timestamp),
+        env.SPKS_DB.prepare(
+          "UPDATE packages SET download_count = COALESCE(download_count, 0) + 1 WHERE id = ?"
+        ).bind(packageName),
+      ]);
     } catch (error) {
-      console.error("[Download Stats] ❌ 记录下载统计失败:", error);
+      console.error("[Download Stats] Failed to record:", error);
     }
+  }
+
+  private anonymizeIp(ip: string): string {
+    if (ip === "unknown") return ip;
+    const parts = ip.split(".");
+    if (parts.length === 4) {
+      return `${parts[0]}.${parts[1]}.${parts[2]}.x`;
+    }
+    const colonParts = ip.split(":");
+    if (colonParts.length >= 4) {
+      return `${colonParts[0]}:${colonParts[1]}:${colonParts[2]}::x`;
+    }
+    return "unknown";
   }
 }
