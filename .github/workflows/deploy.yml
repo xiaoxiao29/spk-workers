@@ -20,7 +20,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ github.event.inputs.environment || 'production' }}
     permissions:
       contents: read
       deployments: write
@@ -49,6 +49,9 @@ jobs:
       - name: Build project
         run: npm run build
 
+      - name: Run tests
+        run: npm test
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
@@ -65,6 +68,7 @@ jobs:
             SSPKS_API_KEY: ${{ env.API_KEY }}
 
       - name: Upload static assets to R2
+        if: ${{ env.KV_NAMESPACE_ID != '' }}
         run: |
           npx wrangler r2 object put "spks/public/js/spk-parser.js" --file ./public/js/spk-parser.js
           npx wrangler r2 object put "spks/public/js/upload.js" --file ./public/js/upload.js
@@ -74,6 +78,7 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Clear KV cache
+        if: ${{ env.KV_NAMESPACE_ID != '' }}
         run: |
           npx wrangler kv key delete "static:public/js/spk-parser.js" --namespace-id ${{ env.KV_NAMESPACE_ID }}
           npx wrangler kv key delete "static:public/js/upload.js" --namespace-id ${{ env.KV_NAMESPACE_ID }}
